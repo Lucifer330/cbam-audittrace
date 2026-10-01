@@ -22,6 +22,27 @@ let backendSecurity = null;
 let inlineTraceOpen = false;
 let pdfReportDocumentId = null;
 
+const ICON_PATHS = Object.freeze({
+  grid: `<rect x="3.5" y="3.5" width="7" height="7"/><rect x="13.5" y="3.5" width="7" height="7"/><rect x="3.5" y="13.5" width="7" height="7"/><rect x="13.5" y="13.5" width="7" height="7"/>`,
+  document: `<path d="M6 2.75h8l4 4v14.5H6z"/><path d="M14 2.75v4h4M9 12h6M9 16h6"/>`,
+  check: `<path d="m5 12 4 4L19 6"/>`,
+  calculator: `<rect x="4" y="2.75" width="16" height="18.5" rx="1"/><path d="M7.5 6.5h9v4h-9zM8 14h.01M12 14h.01M16 14h.01M8 17.5h.01M12 17.5h.01M16 17.5h.01"/>`,
+  clock: `<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>`,
+  rules: `<path d="M4 4.5a2 2 0 0 1 2-2h12v18H6a2 2 0 0 1-2-2z"/><path d="M4 17.5a2 2 0 0 1 2-2h12M8 7h6M8 10.5h6"/>`,
+  report: `<path d="M5 3h14v18H5z"/><path d="M8 8h8M8 12h8M8 16h5"/>`,
+  settings: `<circle cx="12" cy="12" r="3"/><path d="m19.4 15 .1.1 1.1 1.9-2 3.4-2.2-.5-.2.1-1.2 1.5h-4l-1.2-1.5-.2-.1-2.2.5-2-3.4 1.1-1.9.1-.2v-2.1l-.1-.2-1.1-1.9 2-3.4 2.2.5.2-.1L11 6.1h4l1.2 1.5.2.1 2.2-.5 2 3.4-1.1 1.9-.1.2z"/>`,
+  plus: `<path d="M12 5v14M5 12h14"/>`,
+  info: `<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5h.01"/>`,
+  search: `<circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/>`,
+  upload: `<path d="M12 16V4m-5 5 5-5 5 5"/><path d="M4 14v6h16v-6"/>`,
+  alert: `<path d="M12 3 2.8 20h18.4z"/><path d="M12 9v4M12 16.5h.01"/>`,
+  arrowUpRight: `<path d="M7 17 17 7M8 7h9v9"/>`,
+});
+
+function uiIcon(name) {
+  return `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true">${ICON_PATHS[name] ?? ICON_PATHS.document}</svg>`;
+}
+
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
@@ -118,7 +139,10 @@ function formatTime(value) {
 
 function statusBadge(status) {
   const labels = { unverified: "Unverified", pending: "Pending review", verified: "Verified", rejected: "Rejected" };
-  return `<span class="status-badge state-${status}"><span class="state-mark" aria-hidden="true">${status === "verified" ? "✓" : status === "pending" ? "!" : status === "rejected" ? "×" : "—"}</span>${labels[status] ?? "Unverified"}</span>`;
+  const mark = status === "verified"
+    ? `<svg class="state-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 8.2 3 3 6-6.4"/></svg>`
+    : status === "pending" ? "!" : status === "rejected" ? "×" : "—";
+  return `<span class="status-badge state-${status}"><span class="state-mark" aria-hidden="true">${mark}</span>${labels[status] ?? "Unverified"}</span>`;
 }
 
 function pageHeading(eyebrow, title, subtitle, action = "") {
@@ -126,7 +150,7 @@ function pageHeading(eyebrow, title, subtitle, action = "") {
 }
 
 function metricCard(label, value, foot, icon) {
-  return `<div class="metric-card"><div class="metric-label">${label}<span class="metric-icon">${icon}</span></div><div class="metric-value">${value}</div><div class="metric-foot">${foot}</div></div>`;
+  return `<div class="metric-card"><div class="metric-label">${label}<span class="metric-icon">${uiIcon(icon)}</span></div><div class="metric-value">${value}</div><div class="metric-foot">${foot}</div></div>`;
 }
 
 function getStats() {
@@ -142,7 +166,7 @@ function renderDashboard() {
   const stats = getStats();
   const recentDocuments = [...state.documents].sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt)).slice(0, 5);
   const recentCalculations = state.documents.filter((doc) => doc.calculation).slice(-4).reverse();
-  const uploadButton = `<button class="primary-button" data-action="trigger-upload"><span class="button-icon">＋</span> Upload supplier document</button>`;
+  const uploadButton = `<button class="primary-button" data-action="trigger-upload"><span class="button-icon">${uiIcon("plus")}</span> Upload supplier document</button>`;
   const documentRows = recentDocuments.map((doc) => {
     const pending = doc.fields.some((field) => field.status === "pending");
     return `<tr data-open-document="${escapeHtml(doc.id)}"><td><div class="file-cell"><span class="file-icon">PDF</span><span>${escapeHtml(doc.fileName)}<small>${escapeHtml(doc.documentType)}</small></span></div></td><td>${formatDate(doc.uploadedAt)}</td><td>${doc.fields.length ? (pending ? `<span class="status-badge pending"><span class="status-dot"></span>Review needed</span>` : `<span class="status-badge verified"><span class="status-dot"></span>Verified</span>`) : `<span class="status-badge neutral">No extraction</span>`}</td><td>${doc.calculation ? `${formatNumber(doc.calculation.result)} tCO₂e` : "—"}</td></tr>`;
@@ -154,16 +178,16 @@ function renderDashboard() {
   content.innerHTML = `
     ${pageHeading("Compliance workspace", "Workspace overview", "Review supplier evidence and keep every CBAM number connected to its source.", uploadButton)}
     <div class="metric-grid">
-      ${metricCard("Documents processed", stats.documents, "In this local workspace", "▤")}
-      ${metricCard("Pending verification", stats.pending, "Human review required", "◷")}
-      ${metricCard("Verified calculations", stats.calculations, "Deterministic rule execution", "∑")}
-      ${metricCard("Exceptions", stats.exceptions, "Items requiring attention", "!")}
-      ${metricCard("Audit readiness", stats.auditReady, "Verified records with provenance", "✓")}
+      ${metricCard("Documents processed", stats.documents, "In this local workspace", "document")}
+      ${metricCard("Pending verification", stats.pending, "Human review required", "clock")}
+      ${metricCard("Verified calculations", stats.calculations, "Deterministic rule execution", "calculator")}
+      ${metricCard("Exceptions", stats.exceptions, "Items requiring attention", "alert")}
+      ${metricCard("Audit readiness", stats.auditReady, "Verified records with provenance", "check")}
     </div>
-    <div class="notice-strip"><span class="notice-mark">ⓘ</span><span><strong>Illustrative sample only.</strong> This workspace demonstrates evidence traceability; it is not an official CBAM filing. Verify against current official CBAM guidance before compliance use.</span></div>
+    <div class="notice-strip"><span class="notice-mark">${uiIcon("info")}</span><span><strong>Illustrative sample only.</strong> This workspace demonstrates evidence traceability; it is not an official CBAM filing. Verify against current official CBAM guidance before compliance use.</span></div>
     <div class="dashboard-grid">
       <section class="panel"><div class="panel-header"><div><h2>Verification queue</h2><p>Documents with fields awaiting human review</p></div><button class="text-link" data-page="verification">Open queue →</button></div>
-        ${recentDocuments.length ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Document</th><th>Uploaded</th><th>Status</th><th>Result</th></tr></thead><tbody>${documentRows}</tbody></table></div>` : `<div class="empty-state"><div class="empty-icon">▤</div><h3>Your evidence workspace is ready</h3><p>Upload a supplier PDF, or load the bundled illustrative invoice to try the complete audit flow.</p><div class="empty-actions"><button class="primary-button" data-action="load-demo">Load demo invoice</button><button class="secondary-button" data-action="trigger-upload">Upload a PDF</button></div></div>`}
+        ${recentDocuments.length ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Document</th><th>Uploaded</th><th>Status</th><th>Result</th></tr></thead><tbody>${documentRows}</tbody></table></div>` : `<div class="empty-state"><div class="empty-icon">${uiIcon("document")}</div><h3>Your evidence workspace is ready</h3><p>Upload a supplier PDF, or load the bundled illustrative invoice to try the complete audit flow.</p><div class="empty-actions"><button class="primary-button" data-action="load-demo">Load demo invoice</button><button class="secondary-button" data-action="trigger-upload">Upload a PDF</button></div></div>`}
       </section>
       <section class="panel"><div class="panel-header"><div><h2>Recent activity</h2><p>Recorded actions in this workspace</p></div><button class="text-link" data-page="audit">Audit trail →</button></div><div class="activity-summary">${state.events.length ? [...state.events].slice(-6).reverse().map((item) => `<div class="activity-row"><span class="activity-mark"></span><div><strong>${escapeHtml(item.description)}</strong><small>${formatTime(item.at)} · ${escapeHtml(item.documentReference ?? "Workspace")}</small></div></div>`).join("") : `<div class="calc-empty"><strong>No activity yet</strong><span>Upload a document or load the illustrative invoice to begin.</span></div>`}</div></section>
     </div>`;
@@ -177,7 +201,7 @@ function renderVerification() {
   const rows = pendingDocs.flatMap(({ doc, fields }) => fields.map((field) => `<tr><td>${escapeHtml(doc.fields.find((item) => item.id === "supplier_name")?.value ?? "—")}</td><td>${escapeHtml(doc.fileName)}</td><td>${escapeHtml(field.label)} <small class="table-subtext">${escapeHtml(field.value)} ${escapeHtml(field.unit)}</small></td><td>${statusBadge("pending")}</td><td>${formatDate(doc.uploadedAt)}</td><td><button class="quiet-button" data-review-field="${escapeHtml(doc.id)}" data-field-id="${escapeHtml(field.id)}">Review →</button></td></tr>`)).join("");
   content.innerHTML = `${pageHeading("Human review", "Verification queue", "Review every proposed value against its source document before calculation.", `<button class="secondary-button" data-page="documents">Browse documents</button>`)}
     <section class="panel"><div class="panel-header"><div><h2>Fields pending review</h2><p>${rows ? pendingDocs.reduce((sum, item) => sum + item.fields.length, 0) : 0} field(s) require confirmation</p></div></div>
-      ${rows ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Supplier</th><th>Document</th><th>Field</th><th>Status</th><th>Uploaded</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty-state"><div class="empty-icon">✓</div><h3>Verification queue is clear</h3><p>New extracted and manually entered values appear here as pending review.</p><div class="empty-actions"><button class="primary-button" data-action="load-demo">Load illustrative sample</button></div></div>`}
+      ${rows ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Supplier</th><th>Document</th><th>Field</th><th>Status</th><th>Uploaded</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty-state"><div class="empty-icon">${uiIcon("check")}</div><h3>Verification queue is clear</h3><p>New extracted and manually entered values appear here as pending review.</p><div class="empty-actions"><button class="primary-button" data-action="load-demo">Load illustrative sample</button></div></div>`}
     </section>`;
 }
 
@@ -186,7 +210,7 @@ function renderCalculations() {
   const rows = docs.map((doc) => `<tr><td>${escapeHtml(doc.fileName)}</td><td>${formatNumber(doc.calculation.netMass)} t</td><td>${formatNumber(doc.calculation.emissionFactor)} tCO₂e/t</td><td><button class="text-link" data-open-document="${escapeHtml(doc.id)}" data-action="open-provenance">${formatNumber(doc.calculation.result)} tCO₂e</button></td><td>${escapeHtml(doc.calculation.rule.version)}</td></tr>`).join("");
   content.innerHTML = `${pageHeading("Deterministic outputs", "Calculations", "Results are generated only from human-verified inputs and a versioned rule.")}
     <section class="panel"><div class="panel-header"><div><h2>Verified calculations</h2><p>${docs.length} calculation(s) available</p></div></div>
-      ${rows ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Source document</th><th>Net mass</th><th>Emission factor</th><th>Result</th><th>Rule version</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty-state"><div class="empty-icon">∑</div><h3>No calculations generated</h3><p>Verify net mass and emission factor in a document to unlock calculation.</p><div class="empty-actions"><button class="primary-button" data-action="load-demo">Load illustrative sample</button></div></div>`}
+      ${rows ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Source document</th><th>Net mass</th><th>Emission factor</th><th>Result</th><th>Rule version</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty-state"><div class="empty-icon">${uiIcon("calculator")}</div><h3>No calculations generated</h3><p>Verify net mass and emission factor in a document to unlock calculation.</p><div class="empty-actions"><button class="primary-button" data-action="load-demo">Load illustrative sample</button></div></div>`}
     </section>`;
 }
 
@@ -203,7 +227,7 @@ function renderReports() {
   const rows = docs.map((doc) => `<tr><td>${escapeHtml(doc.fileName)}</td><td>${escapeHtml(doc.fields.find((field) => field.id === "supplier_name")?.verifiedValue ?? doc.fields.find((field) => field.id === "supplier_name")?.value ?? "—")}</td><td>${doc.calculation ? `<button class="calc-value calc-value-link" data-open-document="${escapeHtml(doc.id)}" data-action="open-provenance">${formatNumber(doc.calculation.result)} tCO₂e</button>` : "No calculation"}</td><td>${doc.calculation ? `<span class="status-badge state-verified">Verified</span>` : `<span class="status-badge state-unverified">Inputs incomplete</span>`}</td><td><button class="quiet-button" data-action="export-report-for" data-document-id="${escapeHtml(doc.id)}">JSON</button>${doc.calculation ? `<button class="quiet-button" data-action="export-pdf-for" data-document-id="${escapeHtml(doc.id)}" ${pdfReportDocumentId === doc.id ? "disabled" : ""}>${pdfReportDocumentId === doc.id ? "Generating PDF…" : "PDF"}</button>` : ""}</td></tr>`).join("");
   content.innerHTML = `${pageHeading("Audit deliverables", "Reports", "Export a traceable report for a source document.", `<button class="secondary-button" data-page="audit">View audit trail</button>`)}
     <section class="panel"><div class="panel-header"><div><h2>Report records</h2><p>JSON includes field-level provenance and audit events; PDF summarizes the verified calculation.</p></div></div>
-      ${rows ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Document</th><th>Supplier</th><th>Result</th><th>Status</th><th>Export</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty-state"><div class="empty-icon">▧</div><h3>No reportable records</h3><p>Load a sample document and verify its inputs to prepare a report.</p><div class="empty-actions"><button class="primary-button" data-action="load-demo">Load illustrative sample</button></div></div>`}
+      ${rows ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Document</th><th>Supplier</th><th>Result</th><th>Status</th><th>Export</th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty-state"><div class="empty-icon">${uiIcon("report")}</div><h3>No reportable records</h3><p>Load a sample document and verify its inputs to prepare a report.</p><div class="empty-actions"><button class="primary-button" data-action="load-demo">Load illustrative sample</button></div></div>`}
     </section>`;
 }
 
@@ -290,10 +314,10 @@ function renderDocumentsList() {
   const docs = [...state.documents].sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
   const rows = docs.map((doc) => `<tr data-open-document="${escapeHtml(doc.id)}"><td><div class="file-cell"><span class="file-icon">PDF</span><span>${escapeHtml(doc.fileName)}<small>${escapeHtml(doc.documentType)}</small></span></div></td><td>${formatDate(doc.uploadedAt)}</td><td>${escapeHtml(doc.processingStatus)}</td><td>${doc.calculation ? `${formatNumber(doc.calculation.result)} tCO₂e` : "—"}</td><td><button class="quiet-button" data-open-document="${escapeHtml(doc.id)}">Open →</button></td></tr>`).join("");
   content.innerHTML = `
-    ${pageHeading("Evidence library", "Documents", "Supplier source records, extraction proposals, and verified fields.", `<button class="primary-button" data-action="trigger-upload"><span class="button-icon">＋</span> Upload document</button>`)}
-    <div class="upload-drop"><div class="upload-drop-icon">↑</div><div class="upload-copy"><strong>Upload a supplier PDF</strong><span>PDF, up to 15 MB. The file stays in this browser session.</span></div><button class="secondary-button" data-action="trigger-upload">Choose PDF</button></div>
+    ${pageHeading("Evidence library", "Documents", "Supplier source records, extraction proposals, and verified fields.", `<button class="primary-button" data-action="trigger-upload"><span class="button-icon">${uiIcon("plus")}</span> Upload document</button>`)}
+    <div class="upload-drop"><div class="upload-drop-icon">${uiIcon("upload")}</div><div class="upload-copy"><strong>Upload a supplier PDF</strong><span>PDF, up to 15 MB. The file stays in this browser session.</span></div><button class="secondary-button" data-action="trigger-upload">Choose PDF</button></div>
     <section class="panel"><div class="panel-header"><div><h2>All documents</h2><p>${docs.length} document${docs.length === 1 ? "" : "s"} in this workspace</p></div><button class="text-link" data-action="load-demo">Load illustrative sample</button></div>
-      ${docs.length ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Document</th><th>Uploaded</th><th>Processing</th><th>Calculation</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty-state"><div class="empty-icon">▤</div><h3>No documents yet</h3><p>Load the bundled sample for a fast end-to-end demo, or upload your own PDF.</p><div class="empty-actions"><button class="primary-button" data-action="load-demo">Load demo invoice</button></div></div>`}
+      ${docs.length ? `<div class="table-wrap"><table class="data-table"><thead><tr><th>Document</th><th>Uploaded</th><th>Processing</th><th>Calculation</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty-state"><div class="empty-icon">${uiIcon("document")}</div><h3>No documents yet</h3><p>Load the bundled sample for a fast end-to-end demo, or upload your own PDF.</p><div class="empty-actions"><button class="primary-button" data-action="load-demo">Load demo invoice</button></div></div>`}
     </section>
     <div class="upload-warning"><strong>Extraction boundary:</strong> the local demo fallback proposes fields only for the bundled illustrative invoice. Uploaded PDFs are previewed locally; this offline MVP does not claim OCR or AI extraction for arbitrary files. Add source fields manually or use the sample to demonstrate the verification and audit workflow.</div>`;
 }
@@ -317,7 +341,7 @@ function renderFieldCard(field) {
     <div class="field-title-row"><span class="field-title">${escapeHtml(field.label)}</span>${statusBadge(visualState)}</div>
     ${editControl}
     <div class="field-meta"><span>${field.confidence == null ? "Manual entry" : `${escapeHtml(field.confidence)}% confidence`}</span><span>Page ${escapeHtml(field.page ?? "—")}</span></div>
-    ${field.status === "verified" ? `<div class="verified-value">✓ Verified by ${escapeHtml(field.verifiedBy ?? "Demo auditor")} · ${formatTime(field.verifiedAt)}</div>` : ""}
+    ${field.status === "verified" ? `<div class="verified-value"><svg class="verified-check" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 8.2 3 3 6-6.4"/></svg>Verified by ${escapeHtml(field.verifiedBy ?? "Demo auditor")} · ${formatTime(field.verifiedAt)}</div>` : ""}
     ${field.status === "rejected" ? `<div class="verified-value">Rejected by ${escapeHtml(field.verifiedBy ?? "Demo auditor")}</div>` : ""}
     ${actions}
   </article>`;
@@ -353,8 +377,8 @@ function manualFieldForm(doc) {
 
 function renderExceptions(document) {
   const exceptions = getExceptions(document);
-  if (!exceptions.length) return `<div class="no-exceptions">✓ No input issues detected for the current calculation.</div>`;
-  return exceptions.map((exception) => `<div class="exception-item"><span class="exception-icon">!</span><span>${escapeHtml(exception)}</span></div>`).join("");
+  if (!exceptions.length) return `<div class="no-exceptions">${uiIcon("check")}No input issues detected for the current calculation.</div>`;
+  return exceptions.map((exception) => `<div class="exception-item"><span class="exception-icon">${uiIcon("alert")}</span><span>${escapeHtml(exception)}</span></div>`).join("");
 }
 
 function renderDocumentWorkspace(doc) {
@@ -365,11 +389,11 @@ function renderDocumentWorkspace(doc) {
       ? `/api/documents/${encodeURIComponent(doc.id)}/file`
       : (uploadDataByDocId.get(doc.id) ?? null);
   const sourcePanel = selectedField
-    ? `<div class="source-focus"><strong>Selected source:</strong> Page ${escapeHtml(selectedField.page ?? "—")} · <code>${escapeHtml(selectedField.sourceText ?? "Manually added field")}</code><br>${selectedField.coordinates ? `Coordinates: x=${selectedField.coordinates.x}, y=${selectedField.coordinates.y} · ` : ""}Proposed: ${escapeHtml(selectedField.value)} ${escapeHtml(selectedField.unit)}</div>`
+    ? `<div class="source-focus"><strong>Selected source:</strong> Page ${escapeHtml(selectedField.page ?? "—")} · <code>${escapeHtml(selectedField.sourceText ?? "Manually added field")}</code><br>${selectedField.coordinates ? `<span class="source-coordinates">Coordinates: x=${selectedField.coordinates.x}, y=${selectedField.coordinates.y}</span> · ` : ""}Proposed: ${escapeHtml(selectedField.value)} ${escapeHtml(selectedField.unit)}</div>`
     : "";
   const fieldsMarkup = doc.fields.length
     ? doc.fields.map(renderFieldCard).join("")
-    : `<div class="empty-state"><div class="empty-icon">⌕</div><h3>No extraction available for this upload</h3><p>The offline fallback only extracts the bundled sample. Add source fields manually below; each still requires human verification.</p></div>${manualFieldForm(doc)}`;
+    : `<div class="empty-state"><div class="empty-icon">${uiIcon("search")}</div><h3>No extraction available for this upload</h3><p>The offline fallback only extracts the bundled sample. Add source fields manually below; each still requires human verification.</p></div>${manualFieldForm(doc)}`;
   const mass = doc.fields.find((field) => field.id === "net_mass");
   const factor = doc.fields.find((field) => field.id === "emissions_value");
   const missingRequired = [
@@ -388,10 +412,10 @@ function renderDocumentWorkspace(doc) {
   }
   const resultMarkup = doc.calculation
     ? `<section class="verified-result"><div class="verified-result-head"><span class="result-eyebrow">Verified result</span><span class="rule-reference">${escapeHtml(doc.calculation.rule.ruleId)} · ${escapeHtml(doc.calculation.rule.version)}</span></div><div class="result-line"><button class="result-number" data-action="toggle-trace" aria-expanded="${inlineTraceOpen}" aria-controls="inline-provenance">${formatNumber(doc.calculation.result)}<span class="result-unit">tCO₂e</span></button><button class="recalculate-link" data-action="calculate">Recalculate</button></div><div class="result-rule">Select the result to inspect its complete evidence chain.</div></section>
-      ${inlineTraceOpen ? `<section class="provenance-inline" id="inline-provenance" aria-label="Calculation provenance">
+      <section class="provenance-inline ${inlineTraceOpen ? "is-open" : ""}" id="inline-provenance" aria-label="Calculation provenance" aria-hidden="${!inlineTraceOpen}" ${inlineTraceOpen ? "" : "inert"}>
         <div class="trace-heading"><span>Calculation provenance</span><button class="trace-close" data-action="toggle-trace">Close</button></div>
         <div class="trace-chain" aria-label="Source, verified input, rule version, formula, result">
-          <button class="trace-node" data-action="trace-source" data-field-id="emissions_value"><span class="trace-index">01</span><span class="trace-label">Source</span><strong>${escapeHtml(doc.fileName)}</strong><small>${escapeHtml(factor?.id ?? "—")} · Page ${escapeHtml(factor?.page ?? "—")}${factor?.coordinates ? ` · x=${factor.coordinates.x}, y=${factor.coordinates.y}` : ""}</small></button>
+          <button class="trace-node" data-action="trace-source" data-field-id="emissions_value"><span class="trace-index">01</span><span class="trace-label">Source</span><strong>${escapeHtml(doc.fileName)}</strong><small>${escapeHtml(factor?.id ?? "—")} · Page ${escapeHtml(factor?.page ?? "—")}${factor?.coordinates ? ` · <span class="trace-coordinate">x=${factor.coordinates.x}, y=${factor.coordinates.y}</span>` : ""}</small></button>
           <span class="trace-arrow" aria-hidden="true">→</span>
           <button class="trace-node" data-action="trace-input" data-field-id="emissions_value"><span class="trace-index">02</span><span class="trace-label">Verified input</span><strong>${escapeHtml(factor?.verifiedValue ?? "—")} ${escapeHtml(factor?.unit ?? "")}</strong><small>Human-verified · ${escapeHtml(factor?.verifiedBy ?? "—")} · Page ${escapeHtml(factor?.page ?? "—")}</small></button>
           <span class="trace-arrow" aria-hidden="true">→</span>
@@ -401,13 +425,13 @@ function renderDocumentWorkspace(doc) {
           <span class="trace-arrow" aria-hidden="true">→</span>
           <div class="trace-node trace-final"><span class="trace-index">05</span><span class="trace-label">Result</span><strong>${formatNumber(doc.calculation.result)} tCO₂e</strong><small>${formatDate(doc.calculation.executedAt, { hour: "2-digit", minute: "2-digit" })}</small></div>
         </div>
-      </section>` : ""}`
+      </section>`
     : `<section class="calculation-lock ${missingRequired.length ? "is-locked" : "is-ready"}"><div class="calculation-lock-title"><span class="result-eyebrow">Verified result</span><strong>${missingRequired.length ? "Calculation locked" : "Ready to calculate"}</strong></div><button class="primary-button calculate-button" data-action="calculate" ${missingRequired.length ? "disabled" : ""}>Calculate</button><p class="lock-reason" role="status">${missingRequired.length ? `Verify ${missingRequired.join(" and ")} to calculate.` : "Required fields confirmed. Calculate to create a verified result."}</p></section>`;
   const preview = doc.isDemo
     ? `<div class="pdf-viewer">${sampleDocumentMarkup(doc)}</div>`
     : pdfData
       ? `<div class="pdf-viewer"><iframe title="Uploaded source PDF" src="${pdfData}"></iframe></div>`
-      : `<div class="pdf-viewer"><div class="empty-state" style="align-self:center"><div class="empty-icon">▧</div><h3>PDF is not available after reload</h3><p>Uploaded file previews stay in browser memory. Re-upload the source file to preview it again; verified metadata and audit events are retained.</p><button class="secondary-button" data-action="trigger-upload">Re-upload PDF</button></div></div>`;
+      : `<div class="pdf-viewer"><div class="empty-state" style="align-self:center"><div class="empty-icon">${uiIcon("report")}</div><h3>PDF is not available after reload</h3><p>Uploaded file previews stay in browser memory. Re-upload the source file to preview it again; verified metadata and audit events are retained.</p><button class="secondary-button" data-action="trigger-upload">Re-upload PDF</button></div></div>`;
   content.innerHTML = `
     ${pageHeading("Source review", escapeHtml(doc.fileName), `${escapeHtml(doc.documentType)} · Uploaded ${formatDate(doc.uploadedAt, { hour: "2-digit", minute: "2-digit" })}`, `<div class="quick-actions"><button class="secondary-button" data-page="documents">← Documents</button>${doc.isDemo ? `<button class="secondary-button" data-action="download-sample">Download sample PDF</button>` : ""}</div>`)}
     <div class="document-layout review-workspace">
@@ -418,7 +442,7 @@ function renderDocumentWorkspace(doc) {
         <div class="field-list">${fieldsMarkup}</div>
         ${manualFieldForm(doc)}
         ${resultMarkup}
-        <section class="scenario-panel scenario-workspace"><div class="scenario-header"><div><span class="scenario-kicker">Separate analysis</span><h2>Scenario — not verified</h2></div><span class="scenario-mark" aria-hidden="true">↗</span></div><div class="scenario-body"><div class="scenario-top"><label for="scenario-factor">Emission factor <span>(tCO₂e/t)</span></label><input class="scenario-input" id="scenario-factor" type="number" min="0.000001" step="0.1" value="${escapeHtml(initialFactor)}" ${!canScenario ? "disabled" : ""}></div><div class="scenario-result"><span>Scenario result</span><strong id="scenario-result">${escapeHtml(scenarioValue)}</strong></div><p class="scenario-warning">Scenario only — does not modify verified records.</p></div></section>
+        <section class="scenario-panel scenario-workspace"><div class="scenario-header"><div><span class="scenario-kicker">Separate analysis</span><h2>Scenario — not verified</h2></div><span class="scenario-mark" aria-hidden="true">${uiIcon("arrowUpRight")}</span></div><div class="scenario-body"><div class="scenario-top"><label for="scenario-factor">Emission factor <span>(tCO₂e/t)</span></label><input class="scenario-input" id="scenario-factor" type="number" min="0.000001" step="0.1" value="${escapeHtml(initialFactor)}" ${!canScenario ? "disabled" : ""}></div><div class="scenario-result"><span>Scenario result</span><strong id="scenario-result">${escapeHtml(scenarioValue)}</strong></div><p class="scenario-warning">Scenario only — does not modify verified records.</p></div></section>
         <section class="exception-panel"><div class="exception-heading"><strong>Exceptions</strong><span class="exception-count">${getExceptions(doc).length} to review</span></div><div class="exception-body">${renderExceptions(doc)}</div></section>
       </section>
     </div>`;
