@@ -22,6 +22,7 @@ UPLOAD_DIR = Path(os.environ.get("CBAM_UPLOAD_DIR", ROOT / "data" / "uploads"))
 MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 RULE_ID = "EMBEDDED_EMISSIONS"
 RULE_VERSION = "v2026.1"
+PORT = int(os.environ.get("PORT", "4173"))
 ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.environ.get(
@@ -517,3 +518,9 @@ def stylesheet() -> FileResponse:
 
 
 app.mount("/src", StaticFiles(directory=ASSET_ROOT / "src"), name="frontend-source")
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=PORT)
