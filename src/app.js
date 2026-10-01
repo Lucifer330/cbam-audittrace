@@ -393,7 +393,7 @@ function renderDocumentWorkspace(doc) {
     : "";
   const fieldsMarkup = doc.fields.length
     ? doc.fields.map(renderFieldCard).join("")
-    : `<div class="empty-state"><div class="empty-icon">${uiIcon("search")}</div><h3>No extraction available for this upload</h3><p>The offline fallback only extracts the bundled sample. Add source fields manually below; each still requires human verification.</p></div>${manualFieldForm(doc)}`;
+    : `<div class="empty-state"><div class="empty-icon">${uiIcon("search")}</div><h3>No extraction available for this upload</h3><p>The offline fallback only extracts the bundled sample. Add source fields manually below; each still requires human verification.</p></div>`;
   const mass = doc.fields.find((field) => field.id === "net_mass");
   const factor = doc.fields.find((field) => field.id === "emissions_value");
   const missingRequired = [
