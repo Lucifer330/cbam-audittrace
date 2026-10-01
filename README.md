@@ -152,4 +152,4 @@ npm run test:backend    # backend tests
 
 ---
 
-**CBAM-AuditTrace** · Team Ziddi Lucifer · CodeBlitz 2.0
+**CBAM-AuditTrace** · 
